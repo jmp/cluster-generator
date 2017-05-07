@@ -7,6 +7,7 @@ Run with the --help option to see all the flags.
 
 from __future__ import print_function
 from argparse import ArgumentParser
+from os.path import basename
 from random import gauss, randint, uniform, seed
 from time import time
 
@@ -59,14 +60,14 @@ def write_points_to_file(points, file):
         print(" ".join(str(component) for component in point), file=file)
 
 
-def generate_cluster(num_points, center_x, center_y, sigma):
+def generate_cluster(num_points, mean_x, mean_y, sigma):
     """
     Generates a random Gaussian cluster with num_points.
     The cluster mean will be x, y and its standard deviation sigma.
     """
     return [(
-        int(gauss(center_x, sigma)),
-        int(gauss(center_y, sigma)),
+        int(gauss(mean_x, sigma)),
+        int(gauss(mean_y, sigma)),
     ) for _ in range(num_points)]
 
 
@@ -78,17 +79,23 @@ def generate_clusters(num_clusters, limits):
     clusters = []
     ground_truth = []
     for _ in range(num_clusters):
-        center = (
+        mean = (
             randint(limits["min_x"], limits["max_x"]),
             randint(limits["min_y"], limits["max_y"]),
         )
-        clusters.append(generate_cluster(
+        sigma = uniform(limits["min_sigma"], limits["max_sigma"])
+        points = generate_cluster(
             num_points=randint(limits["min_points"], limits["max_points"]),
-            center_x=center[0],
-            center_y=center[1],
-            sigma=uniform(limits["min_sigma"], limits["max_sigma"]),
-        ))
-        ground_truth.append(center)
+            mean_x=mean[0],
+            mean_y=mean[1],
+            sigma=sigma,
+        )
+        clusters.append(points)
+        ground_truth.append({
+            'mean': mean,
+            'sigma': sigma,
+            'n': len(points),
+        })
     return clusters, ground_truth
 
 
@@ -97,10 +104,17 @@ def print_parameters(args):
     Prints the parameters used for generating the clusters.
     """
     print("Generated clusters using the following parameters:")
-    print("--------------------------------------------------")
-    for key, value in vars(args).items():
-        print("{}: {}".format(key, value))
-    print("--------------------------------------------------")
+    script_name = basename(__file__)
+    script_parameters = " ".join("--{}={}".format(key.replace("_", "-"), value) for key, value in vars(args).items())
+    print("    {} {}".format(script_name, script_parameters))
+
+
+def print_ground_truth(ground_truth):
+    print("Ground truth:")
+    for number, cluster_data in enumerate(ground_truth):
+        print("    Cluster {}:".format(number + 1))
+        for key, value in cluster_data.items():
+            print("        {}: {}".format(key, value))
 
 
 def show_plot(points, centroids, title):
@@ -117,7 +131,7 @@ def show_plot(points, centroids, title):
     pyplot.scatter(*zip(*points), c='k', s=2)
     # Ground truth
     for centroid in centroids:
-        pyplot.scatter(*zip(*[centroid]), c='r', s=30)
+        pyplot.scatter(*zip(*[centroid]), c='r', s=40)
     pyplot.show()
 
 
@@ -133,7 +147,7 @@ def run():
     seed(args.seed)
 
     # Generate the clusters
-    new_clusters, ground_truth = generate_clusters(
+    clusters, ground_truth = generate_clusters(
         args.num_clusters,
         limits={
             "min_points": min(args.min_points, args.max_points),
@@ -147,8 +161,8 @@ def run():
         }
     )
 
-    points = [point for cluster in new_clusters for point in cluster]
-    centroids = [point for point in ground_truth]
+    points = [point for cluster in clusters for point in cluster]
+    centroids = [cluster_data['mean'] for cluster_data in ground_truth]
 
     with open(args.points_file, "wt") as file:
         write_points_to_file(points, file)
@@ -157,6 +171,7 @@ def run():
         write_points_to_file(centroids, file)
 
     print_parameters(args)
+    print_ground_truth(ground_truth)
     show_plot(points, centroids, r"$k={}$ random clusters".format(args.num_clusters))
 
 
