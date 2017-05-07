@@ -110,6 +110,10 @@ def print_parameters(args):
 
 
 def print_ground_truth(ground_truth):
+    """
+    Prints the ground truth, i.e. the cluster means, as well as
+    other parameters used when generating the individual clusters.
+    """
     print("Ground truth:")
     for number, cluster_data in enumerate(ground_truth):
         print("    Cluster {}:".format(number + 1))
